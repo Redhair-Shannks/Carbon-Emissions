@@ -1,7 +1,10 @@
+from contextlib import asynccontextmanager
 from datetime import date
 
-from fastapi import Depends, FastAPI, Query
+from fastapi import Depends, FastAPI, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,10 +25,19 @@ from app.services.analytics import hotspot_payload, intensity_payload, monthly_t
 from app.services.calculation import calculate_kgco2e, get_valid_factor
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    with SessionLocal() as db:
+        seed_database(db)
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     description="Prototype GHG emissions reporting platform with versioned factors and analytics APIs.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -37,11 +49,19 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-    with SessionLocal() as db:
-        seed_database(db)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = [
+        {
+            "field": ".".join(str(part) for part in error["loc"] if part != "body"),
+            "message": error["msg"].removeprefix("Value error, "),
+        }
+        for error in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Request validation failed", "errors": errors},
+    )
 
 
 @app.get("/health")

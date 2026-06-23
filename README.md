@@ -14,13 +14,24 @@ CarbonSight is a full-stack prototype for Scope 1 and Scope 2 greenhouse-gas rep
 
 ```mermaid
 flowchart LR
-  A["React ESG Dashboard"] --> B["FastAPI API Layer"]
-  B --> C["Calculation Engine"]
-  B --> D["Analytics Service"]
-  C --> E["PostgreSQL"]
-  D --> E
-  F["GHG Sheet.xlsx Seeder"] --> E
+  U["Evaluator / ESG Analyst"] --> F["React + TypeScript Dashboard"]
+  F -->|"HTTP / JSON"| A["FastAPI API"]
+  A --> C["Historical Calculation Engine"]
+  A --> R["Analytics and Reporting Engine"]
+  A --> O["Override and Audit Service"]
+  C --> S["SQLAlchemy ORM"]
+  R --> S
+  O --> S
+  S --> P[("PostgreSQL")]
+  W["GHG Sheet.xlsx"] --> I["Idempotent Seeder"]
+  I --> P
+  D["Docker Compose"] -.-> F
+  D -.-> A
+  D -.-> P
 ```
+
+All application services run through Docker Compose. PostgreSQL stores
+`EmissionFactors`, `EmissionRecords`, `BusinessMetrics`, and `AuditLogs`.
 
 ## Data Model
 
@@ -48,19 +59,63 @@ This supports historical accuracy because the create-record API selects the emis
 | Frontend forms | Emission record form and business metric form |
 | Required charts | Stacked YoY bar, hotspot donut, intensity KPI, monthly trend line |
 
-## Run with Docker
+## Quick Start (3 Commands)
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- Git
+
+### Run the Project
 
 ```bash
+git clone https://github.com/Redhair-Shannks/Carbon-Emissions.git
+cd Carbon-Emissions
 docker compose up --build
 ```
 
-Open:
+### Access
 
-- Frontend: <http://localhost:5173>
-- API docs: <http://localhost:8000/docs>
-- Health check: <http://localhost:8000/health>
+| Service | URL |
+| --- | --- |
+| Frontend dashboard | <http://localhost:5173> |
+| Backend API | <http://localhost:8000> |
+| Swagger documentation | <http://localhost:8000/docs> |
+| Health check | <http://localhost:8000/health> |
+| Historical accuracy proof | <http://localhost:8000/analytics/historical-accuracy-check> |
 
 The backend automatically creates tables and seeds PostgreSQL from `GHG Sheet.xlsx` on startup. The seed includes 2024 records imported from the workbook plus generated 2023 comparison records that use expired factor versions.
+
+## Product Screenshots
+
+### ESG Analytics Dashboard
+
+![CarbonSight analytics dashboard](docs/screenshots/dashboard.png)
+
+### Year-over-Year Scope Comparison
+
+![Year-over-year Scope 1 and Scope 2 chart](docs/screenshots/yoy-chart.png)
+
+### Interactive API Documentation
+
+![FastAPI Swagger documentation](docs/screenshots/swagger-docs.png)
+
+## Historical Accuracy Engine (Key Feature)
+
+A 2023 Diesel activity always uses the emission factor valid in 2023, even
+when a newer factor exists. Factor selection occurs at write time and the
+chosen `factor_id` is permanently linked to the emission record.
+
+Verify the behavior directly:
+
+```text
+GET /analytics/historical-accuracy-check?source_name=Diesel&unit=KL
+```
+
+The response shows the same quantity calculated once with the
+`2023-expired` factor and once with the `2024-active` factor. This is direct,
+machine-verifiable evidence that the platform does not recalculate history
+using the latest factor.
 
 ## Key API Examples
 
@@ -118,8 +173,18 @@ Run tests:
 
 ```bash
 cd backend
-pytest
+pytest -q
 ```
+
+The suite covers:
+
+- Year-over-year Scope 1 and Scope 2 totals
+- Ranked emission hotspots and contribution percentages
+- Emission-intensity calculations
+- Historical factor selection by activity date
+- Scope 2 record creation and factor linkage
+- Manual overrides and immutable audit entries
+- Missing-factor, future-date, and non-positive quantity errors
 
 ## Local Frontend Development
 
@@ -134,3 +199,12 @@ npm run dev
 - Emissions are stored in `kgCO2e` for consistency and displayed as `tCO2e` on the dashboard where readability matters.
 - Scope 3 data exists in the workbook, but the prototype intentionally focuses on Scope 1 and Scope 2 because the assignment prioritizes those scopes.
 - Manual overrides do not destroy calculated values; they preserve the original calculation and add an audit record.
+- API request validation returns structured client errors instead of unhandled server exceptions.
+
+## Optional Public Deployment
+
+The repository includes `render.yaml`, which prepares a Render Blueprint with
+a managed PostgreSQL database, FastAPI Docker service, React static site, and
+backend health check. To publish it, connect this repository in Render and
+create a new Blueprint. Review the generated service URLs and update
+`CORS_ORIGINS` or `VITE_API_BASE_URL` if Render assigns different names.

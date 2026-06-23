@@ -329,8 +329,20 @@ function App() {
                   <YAxis tickFormatter={(value) => `${value / 1000}k`} />
                   <Tooltip formatter={(value) => `${Number(value).toLocaleString()} tCO2e`} />
                   <Legend />
-                  <Bar dataKey="Scope 1" stackId="a" fill="#167c80" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Scope 2" stackId="a" fill="#d08b30" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="Scope 1"
+                    stackId="a"
+                    fill="#167c80"
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                  <Bar
+                    dataKey="Scope 2"
+                    stackId="a"
+                    fill="#d08b30"
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </Panel>
@@ -345,6 +357,7 @@ function App() {
                     innerRadius={72}
                     outerRadius={112}
                     paddingAngle={2}
+                    isAnimationActive={false}
                   >
                     {summary.hotspots.map((_, index) => (
                       <Cell key={index} fill={COLORS[index % COLORS.length]} />
@@ -364,9 +377,30 @@ function App() {
                   <YAxis tickFormatter={(value) => `${value / 1000}k`} />
                   <Tooltip formatter={(value) => `${Number(value).toLocaleString()} tCO2e`} />
                   <Legend />
-                  <Line type="monotone" dataKey="Total" stroke="#294c60" strokeWidth={3} dot={false} />
-                  <Line type="monotone" dataKey="Scope 1" stroke="#167c80" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Scope 2" stroke="#d08b30" strokeWidth={2} dot={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="Total"
+                    stroke="#294c60"
+                    strokeWidth={3}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Scope 1"
+                    stroke="#167c80"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Scope 2"
+                    stroke="#d08b30"
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </Panel>

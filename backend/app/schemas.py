@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class EmissionFactorRead(BaseModel):
@@ -21,12 +21,24 @@ class EmissionFactorRead(BaseModel):
 
 class EmissionRecordCreate(BaseModel):
     activity_date: date
-    source_name: str
-    activity_category: str = "General"
+    source_name: str = Field(min_length=1, max_length=160)
+    activity_category: str = Field(default="General", min_length=1, max_length=160)
     quantity: float = Field(gt=0)
-    unit: str
-    location: str | None = "Central Steel Plant"
-    notes: str | None = None
+    unit: str = Field(min_length=1, max_length=40)
+    location: str | None = Field(default="Central Steel Plant", max_length=160)
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("activity_date")
+    @classmethod
+    def activity_date_cannot_be_future(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Activity date cannot be in the future")
+        return value
+
+    @field_validator("source_name", "activity_category", "unit", mode="before")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
 
 class EmissionRecordRead(BaseModel):
@@ -50,8 +62,13 @@ class EmissionRecordRead(BaseModel):
 
 class OverrideCreate(BaseModel):
     new_emissions_kgco2e: float = Field(ge=0)
-    reason: str = Field(min_length=8)
-    changed_by: str = "admin@demo.com"
+    reason: str = Field(min_length=8, max_length=2000)
+    changed_by: str = Field(default="admin@demo.com", min_length=3, max_length=120)
+
+    @field_validator("reason", "changed_by", mode="before")
+    @classmethod
+    def strip_override_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
 
 class AuditLogRead(BaseModel):
@@ -69,9 +86,21 @@ class AuditLogRead(BaseModel):
 
 class BusinessMetricCreate(BaseModel):
     metric_date: date
-    metric_name: str = "Tons of Steel Produced"
+    metric_name: str = Field(default="Tons of Steel Produced", min_length=1, max_length=160)
     value: float = Field(gt=0)
-    unit: str = "tonnes"
+    unit: str = Field(default="tonnes", min_length=1, max_length=80)
+
+    @field_validator("metric_date")
+    @classmethod
+    def metric_date_cannot_be_future(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("Metric date cannot be in the future")
+        return value
+
+    @field_validator("metric_name", "unit", mode="before")
+    @classmethod
+    def strip_metric_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
 
 
 class BusinessMetricRead(BaseModel):
