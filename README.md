@@ -15,6 +15,14 @@ APIs, and renders an ESG decision dashboard.
 The first dashboard band presents **AI Narrative
 Insights**, **Emission Anomalies**, and a **2030 Reduction Target** tracker.
 
+## Live Deployment
+
+| Service | URL |
+| --- | --- |
+| Dashboard | <https://carbonsight-dashboard.onrender.com> |
+| API documentation | <https://carbonsight-api.onrender.com/docs> |
+| API health | <https://carbonsight-api.onrender.com/health> |
+
 ## Technology Stack
 
 - Backend: FastAPI, SQLAlchemy, Python
@@ -298,10 +306,8 @@ The automated checks cover:
 - Frontend, backend, AI-insight, and anomaly endpoints return HTTP 200
 - Mobile layout has zero horizontal overflow at a 390 CSS-pixel viewport
 
-## Optional Public Deployment
+## Deployment
 
-The repository includes `render.yaml`, which prepares a Render Blueprint with
-a managed PostgreSQL database, FastAPI Docker service, React static site, and
-backend health check. To publish it, connect this repository in Render and
-create a new Blueprint. Review the generated service URLs and update
-`CORS_ORIGINS` or `VITE_API_BASE_URL` if Render assigns different names.
+The production environment is deployed through `render.yaml` as a Render
+Blueprint with managed PostgreSQL, a Docker-based FastAPI service, a React
+static site, and automated backend health checks.
