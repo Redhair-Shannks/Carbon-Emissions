@@ -6,13 +6,13 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 
-CarbonSight is a full-stack greenhouse-gas reporting prototype focused on
+CarbonSight is a full-stack greenhouse-gas reporting platform focused on
 Scope 1 and Scope 2, with Scope 3 expansion scaffolding. It imports the
-supplied `GHG Sheet.xlsx`, stores versioned emission factors, calculates each
+`GHG Sheet.xlsx` dataset, stores versioned emission factors, calculates each
 record using the factor valid on its activity date, exposes advanced analytics
 APIs, and renders an ESG decision dashboard.
 
-The first dashboard band highlights three differentiators: **AI Narrative
+The first dashboard band presents **AI Narrative
 Insights**, **Emission Anomalies**, and a **2030 Reduction Target** tracker.
 
 ## Technology Stack
@@ -27,7 +27,7 @@ Insights**, **Emission Anomalies**, and a **2030 Reduction Target** tracker.
 
 ```mermaid
 flowchart LR
-  U["Evaluator / ESG Analyst"] --> F["React + TypeScript Dashboard"]
+  U["ESG Analyst"] --> F["React + TypeScript Dashboard"]
   F -->|"HTTP / JSON"| A["FastAPI API"]
   A --> C["Historical Calculation Engine"]
   A --> R["Analytics and Reporting Engine"]
@@ -59,24 +59,6 @@ The schema is built around master data and auditability:
 
 This supports historical accuracy because the create-record API selects the emission factor whose validity window contains the activity date.
 
-## Scoring Alignment
-
-| Evaluation item | Implementation |
-| --- | --- |
-| Architecture and stack | Documented FastAPI + PostgreSQL + React architecture |
-| Scalable schema | Versioned factors, emission records, business metrics, audit logs |
-| YoY emissions API | `GET /analytics/yoy?year=2024` |
-| Emission intensity API | `GET /analytics/intensity` |
-| Hotspot API | `GET /analytics/hotspots` |
-| AI narrative API | `GET /analytics/ai-insights` with deterministic fallback |
-| Anomaly API | `GET /analytics/anomalies` |
-| Net-zero tracker | `GET /analytics/net-zero` |
-| Historical accuracy | Calculation engine chooses factors by activity date |
-| Scope 1 and 2 record APIs | `POST /emission-records/scope-1`, `POST /emission-records/scope-2` |
-| Manual overrides | Dashboard override form, `PATCH /emission-records/{id}/override`, and `GET /audit-logs` |
-| Frontend forms | Emission record form and business metric form |
-| Required charts | Stacked YoY bar, hotspot donut, intensity KPI, monthly trend line |
-
 ## Quick Start (3 Commands)
 
 ### Prerequisites
@@ -100,7 +82,7 @@ docker compose up --build
 | Backend API | <http://localhost:8000> |
 | Swagger documentation | <http://localhost:8000/docs> |
 | Health check | <http://localhost:8000/health> |
-| Historical accuracy proof | <http://localhost:8000/analytics/historical-accuracy-check> |
+| Historical accuracy check | <http://localhost:8000/analytics/historical-accuracy-check> |
 
 `localhost` refers to the computer running Docker Compose. The backend root
 redirects to Swagger documentation.
@@ -166,7 +148,7 @@ the target reduction, and the remaining emissions gap.
 | AI narrative insights | `GET /analytics/ai-insights` |
 | Statistical anomalies | `GET /analytics/anomalies?year=2024` |
 | 2030 target progress | `GET /analytics/net-zero?current_year=2024` |
-| Historical-factor proof | `GET /analytics/historical-accuracy-check` |
+| Historical-factor check | `GET /analytics/historical-accuracy-check` |
 | Scope 3 categories | `GET /metadata/scope-3-categories` |
 
 ## Product Screenshots
@@ -196,9 +178,9 @@ GET /analytics/historical-accuracy-check?source_name=Diesel&unit=KL
 ```
 
 The response shows the same quantity calculated once with the
-`2023-expired` factor and once with the `2024-active` factor. This is direct,
-machine-verifiable evidence that the platform does not recalculate history
-using the latest factor.
+`2023-expired` factor and once with the `2024-active` factor. This confirms
+that the platform does not recalculate historical records using the latest
+factor.
 
 ## Key API Examples
 
@@ -290,10 +272,10 @@ npm install
 npm run dev
 ```
 
-## Notes for Evaluators
+## Design Notes
 
 - Emissions are stored in `kgCO2e` for consistency and displayed as `tCO2e` on the dashboard where readability matters.
-- Scope 3 data exists in the workbook, but the prototype intentionally focuses on Scope 1 and Scope 2 because the assignment prioritizes those scopes.
+- Core reporting currently focuses on Scope 1 and Scope 2.
 - Scope 3 is scaffolded through `POST /emission-records/scope-3` and `GET /metadata/scope-3-categories`. Calculations activate when versioned Scope 3 factors are loaded.
 - Manual overrides do not destroy calculated values; they preserve the original calculation and add an audit record.
 - API request validation returns structured client errors instead of unhandled server exceptions.
@@ -304,9 +286,9 @@ GitHub Actions runs on every push to `main` and every pull request. It checks
 Python formatting, executes the backend test suite, installs frontend
 dependencies with `npm ci`, and produces a TypeScript production build.
 
-## Submission Verification
+## Quality Checks
 
-The final local acceptance pass verifies:
+The automated checks cover:
 
 - All 14 backend tests pass
 - Black formatting checks pass
@@ -315,12 +297,6 @@ The final local acceptance pass verifies:
 - PostgreSQL reports healthy
 - Frontend, backend, AI-insight, and anomaly endpoints return HTTP 200
 - Mobile layout has zero horizontal overflow at a 390 CSS-pixel viewport
-
-## Demo Walkthrough
-
-A focused recording script is available in
-[`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). It covers the complete evaluator
-journey in approximately four minutes.
 
 ## Optional Public Deployment
 

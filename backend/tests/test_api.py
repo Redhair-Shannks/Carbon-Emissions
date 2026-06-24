@@ -92,7 +92,7 @@ def test_override_creates_audit_entry(client: TestClient, db: Session) -> None:
         json={
             "new_emissions_kgco2e": 790,
             "reason": "Invoice reconciliation correction",
-            "changed_by": "reviewer@example.com",
+            "changed_by": "analyst@example.com",
         },
     )
 
@@ -108,7 +108,7 @@ def test_override_creates_audit_entry(client: TestClient, db: Session) -> None:
     assert audit.old_value == 820
     assert audit.new_value == 790
     assert audit.reason == "Invoice reconciliation correction"
-    assert audit.changed_by == "reviewer@example.com"
+    assert audit.changed_by == "analyst@example.com"
 
 
 def test_missing_factor_returns_clean_404(client: TestClient) -> None:

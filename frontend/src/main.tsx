@@ -379,7 +379,7 @@ function App() {
     <main>
       <header className="topbar">
         <div>
-          <p className="eyebrow">GHG Protocol Reporting Prototype</p>
+          <p className="eyebrow">GHG Protocol Reporting Platform</p>
           <h1>CarbonSight</h1>
         </div>
         <button

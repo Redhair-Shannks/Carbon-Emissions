@@ -43,7 +43,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description="Prototype GHG emissions reporting platform with versioned factors and analytics APIs.",
+    description="GHG emissions reporting platform with versioned factors and analytics APIs.",
     version="1.0.0",
     lifespan=lifespan,
 )
