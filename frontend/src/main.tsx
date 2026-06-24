@@ -15,7 +15,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, Database, Factory, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Database,
+  Factory,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import "./styles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -92,6 +102,40 @@ type Summary = {
   monthly_trend: TrendRow[];
 };
 
+type InsightPayload = {
+  insights: string[];
+  generated_by: "anthropic" | "deterministic-analytics";
+  model: string | null;
+  notice: string | null;
+};
+
+type Anomaly = {
+  record_id: number;
+  activity_date: string;
+  source_name: string;
+  scope: string;
+  emissions_kgco2e: number;
+  z_score: number;
+  severity: "medium" | "high";
+};
+
+type AnomalyPayload = {
+  anomalies: Anomaly[];
+  total_flagged: number;
+  method: string;
+};
+
+type NetZeroPayload = {
+  baseline_year: number;
+  current_year: number;
+  target_year: number;
+  target_reduction_pct: number;
+  target_emissions_kgco2e: number;
+  gap_to_target_kgco2e: number;
+  progress_pct: number;
+  status: "on-track" | "action-required";
+};
+
 const COLORS = ["#167c80", "#8f5d13", "#345c96", "#6f7d1c", "#9d4b4b", "#5d5a92", "#c2762f", "#487a54"];
 
 function tonnes(value: number) {
@@ -103,12 +147,23 @@ function compactKg(value: number) {
 }
 
 function App() {
+  const initialLoadStarted = React.useRef(false);
   const [summary, setSummary] = React.useState<Summary | null>(null);
   const [factors, setFactors] = React.useState<Factor[]>([]);
   const [records, setRecords] = React.useState<EmissionRecord[]>([]);
   const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
+  const [insightPayload, setInsightPayload] = React.useState<InsightPayload | null>(null);
+  const [anomalyPayload, setAnomalyPayload] = React.useState<AnomalyPayload | null>(null);
+  const [netZeroPayload, setNetZeroPayload] = React.useState<NetZeroPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [intelligenceLoading, setIntelligenceLoading] = React.useState(true);
   const [message, setMessage] = React.useState("");
+  const [recordMessage, setRecordMessage] = React.useState("");
+  const [metricMessage, setMetricMessage] = React.useState("");
+  const [overrideMessage, setOverrideMessage] = React.useState("");
+  const [savingRecord, setSavingRecord] = React.useState(false);
+  const [savingMetric, setSavingMetric] = React.useState(false);
+  const [savingOverride, setSavingOverride] = React.useState(false);
   const [recordForm, setRecordForm] = React.useState({
     scope: "Scope 1",
     activity_date: "2024-07-15",
@@ -161,11 +216,37 @@ function App() {
     setLoading(false);
   }
 
+  async function loadIntelligence() {
+    setIntelligenceLoading(true);
+    try {
+      const [insightResponse, anomalyResponse, netZeroResponse] = await Promise.all([
+        fetch(`${API_BASE}/analytics/ai-insights`),
+        fetch(`${API_BASE}/analytics/anomalies?year=2024`),
+        fetch(`${API_BASE}/analytics/net-zero?current_year=2024`),
+      ]);
+      if (!insightResponse.ok || !anomalyResponse.ok || !netZeroResponse.ok) {
+        throw new Error("Advanced analytics request failed");
+      }
+      setInsightPayload(await insightResponse.json());
+      setAnomalyPayload(await anomalyResponse.json());
+      setNetZeroPayload(await netZeroResponse.json());
+    } catch {
+      setMessage("Advanced insights are temporarily unavailable. Core reporting remains active.");
+    } finally {
+      setIntelligenceLoading(false);
+    }
+  }
+
   React.useEffect(() => {
+    if (initialLoadStarted.current) {
+      return;
+    }
+    initialLoadStarted.current = true;
     loadData().catch(() => {
       setMessage("Backend is not reachable yet. Start Docker Compose or the FastAPI server.");
       setLoading(false);
     });
+    loadIntelligence();
   }, []);
 
   React.useEffect(() => {
@@ -182,67 +263,92 @@ function App() {
 
   async function submitRecord(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const endpoint = recordForm.scope === "Scope 1" ? "scope-1" : "scope-2";
-    const response = await fetch(`${API_BASE}/emission-records/${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        activity_date: recordForm.activity_date,
-        source_name: recordForm.source_name,
-        activity_category: recordForm.activity_category,
-        quantity: Number(recordForm.quantity),
-        unit: recordForm.unit,
-        location: recordForm.location,
-        notes: "Created from dashboard form",
-      }),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      setMessage(error.detail ?? "Unable to create emission record.");
-      return;
+    setSavingRecord(true);
+    setRecordMessage("");
+    try {
+      const endpoint = recordForm.scope === "Scope 1" ? "scope-1" : "scope-2";
+      const response = await fetch(`${API_BASE}/emission-records/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activity_date: recordForm.activity_date,
+          source_name: recordForm.source_name,
+          activity_category: recordForm.activity_category,
+          quantity: Number(recordForm.quantity),
+          unit: recordForm.unit,
+          location: recordForm.location,
+          notes: "Created from dashboard form",
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        setRecordMessage(readApiError(error, "Unable to create emission record."));
+        return;
+      }
+      setRecordMessage("Record saved. Emissions were calculated with the date-valid factor.");
+      await loadData();
+    } catch {
+      setRecordMessage("Could not reach the API. Confirm that the backend is running on port 8000.");
+    } finally {
+      setSavingRecord(false);
     }
-    setMessage("Emission record created with the historically valid factor.");
-    await loadData();
   }
 
   async function submitMetric(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const response = await fetch(`${API_BASE}/business-metrics`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        metric_date: metricForm.metric_date,
-        metric_name: metricForm.metric_name,
-        value: Number(metricForm.value),
-        unit: metricForm.unit,
-      }),
-    });
-    if (!response.ok) {
-      setMessage("Unable to create business metric.");
-      return;
+    setSavingMetric(true);
+    setMetricMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/business-metrics`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metric_date: metricForm.metric_date,
+          metric_name: metricForm.metric_name,
+          value: Number(metricForm.value),
+          unit: metricForm.unit,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        setMetricMessage(readApiError(error, "Unable to save the business metric."));
+        return;
+      }
+      setMetricMessage("Business metric saved. The intensity KPI has been refreshed.");
+      await loadData();
+    } catch {
+      setMetricMessage("Could not reach the API. Confirm that the backend is running on port 8000.");
+    } finally {
+      setSavingMetric(false);
     }
-    setMessage("Business metric added and intensity is ready to refresh.");
-    await loadData();
   }
 
   async function submitOverride(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const response = await fetch(`${API_BASE}/emission-records/${overrideForm.record_id}/override`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        new_emissions_kgco2e: Number(overrideForm.new_emissions_kgco2e),
-        reason: overrideForm.reason,
-        changed_by: overrideForm.changed_by,
-      }),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      setMessage(error.detail ?? "Unable to apply override.");
-      return;
+    setSavingOverride(true);
+    setOverrideMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/emission-records/${overrideForm.record_id}/override`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          new_emissions_kgco2e: Number(overrideForm.new_emissions_kgco2e),
+          reason: overrideForm.reason,
+          changed_by: overrideForm.changed_by,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        setOverrideMessage(readApiError(error, "Unable to apply override."));
+        return;
+      }
+      setOverrideMessage("Override saved. The audit trail now includes this change.");
+      await loadData();
+    } catch {
+      setOverrideMessage("Could not reach the API. Confirm that the backend is running on port 8000.");
+    } finally {
+      setSavingOverride(false);
     }
-    setMessage("Override saved with a complete audit trail.");
-    await loadData();
   }
 
   const yoyChart = summary
@@ -276,7 +382,14 @@ function App() {
           <p className="eyebrow">GHG Protocol Reporting Prototype</p>
           <h1>CarbonSight</h1>
         </div>
-        <button className="iconButton" onClick={() => loadData()} title="Refresh dashboard">
+        <button
+          className="iconButton"
+          onClick={() => {
+            loadData();
+            loadIntelligence();
+          }}
+          title="Refresh dashboard"
+        >
           <RefreshCw size={18} />
           Refresh
         </button>
@@ -284,6 +397,72 @@ function App() {
 
       {message && <div className="notice">{message}</div>}
       {loading && <div className="notice">Loading emissions analytics...</div>}
+
+      <section className="intelligenceGrid">
+        <Panel title="AI Narrative Insights" className="insightPanel">
+          <div className="panelHeading">
+            <Sparkles size={20} />
+            <span>
+              {insightPayload?.generated_by === "anthropic"
+                ? `Generated by ${insightPayload.model}`
+                : "Verified analytics narrative"}
+            </span>
+          </div>
+          {intelligenceLoading && <p className="emptyState">Generating analytical narrative...</p>}
+          <ul className="insightList">
+            {insightPayload?.insights.map((insight) => <li key={insight}>{insight}</li>)}
+          </ul>
+          {insightPayload?.notice && <p className="sourceNote">{insightPayload.notice}</p>}
+        </Panel>
+
+        <Panel title="Emission Anomalies">
+          <div className="panelHeading warningHeading">
+            <AlertTriangle size={20} />
+            <strong>{anomalyPayload?.total_flagged ?? 0} flagged</strong>
+          </div>
+          <div className="anomalyList">
+            {anomalyPayload?.anomalies.slice(0, 3).map((anomaly) => (
+              <div className="anomalyRow" key={anomaly.record_id}>
+                <div>
+                  <strong>{anomaly.source_name}</strong>
+                  <span>
+                    Record #{anomaly.record_id} · {anomaly.activity_date}
+                  </span>
+                </div>
+                <span className={`severityBadge ${anomaly.severity}`}>
+                  {anomaly.severity} · z {anomaly.z_score.toFixed(2)}
+                </span>
+              </div>
+            ))}
+            {!intelligenceLoading && anomalyPayload?.total_flagged === 0 && (
+              <p className="emptyState">No source-level statistical outliers detected.</p>
+            )}
+          </div>
+        </Panel>
+
+        <Panel title="2030 Reduction Target">
+          <div className="panelHeading">
+            <Target size={20} />
+            <strong>{netZeroPayload?.progress_pct.toFixed(1) ?? "0.0"}% progress</strong>
+          </div>
+          <div className="progressTrack" aria-label="Net-zero target progress">
+            <span style={{ width: `${netZeroPayload?.progress_pct ?? 0}%` }} />
+          </div>
+          <div className="targetStats">
+            <div>
+              <span>Target reduction</span>
+              <strong>{netZeroPayload?.target_reduction_pct ?? 50}%</strong>
+            </div>
+            <div>
+              <span>Gap to target</span>
+              <strong>{tonnes(netZeroPayload?.gap_to_target_kgco2e ?? 0)}</strong>
+            </div>
+          </div>
+          <p className="sourceNote">
+            Baseline {netZeroPayload?.baseline_year ?? 2023} · Target {netZeroPayload?.target_year ?? 2030}
+          </p>
+        </Panel>
+      </section>
 
       {summary && (
         <>
@@ -486,10 +665,11 @@ function App() {
                 onChange={(event) => setRecordForm({ ...recordForm, unit: event.target.value })}
               />
             </label>
-            <button className="primaryButton" type="submit">
+            <button className="primaryButton" type="submit" disabled={savingRecord}>
               <Save size={17} />
-              Save record
+              {savingRecord ? "Saving..." : "Save record"}
             </button>
+            <InlineStatus message={recordMessage} />
           </form>
         </Panel>
 
@@ -524,10 +704,11 @@ function App() {
               Unit
               <input value={metricForm.unit} onChange={(event) => setMetricForm({ ...metricForm, unit: event.target.value })} />
             </label>
-            <button className="primaryButton" type="submit">
+            <button className="primaryButton" type="submit" disabled={savingMetric}>
               <Save size={17} />
-              Save metric
+              {savingMetric ? "Saving..." : "Save metric"}
             </button>
+            <InlineStatus message={metricMessage} />
           </form>
         </Panel>
       </section>
@@ -579,10 +760,11 @@ function App() {
                 onChange={(event) => setOverrideForm({ ...overrideForm, changed_by: event.target.value })}
               />
             </label>
-            <button className="primaryButton" type="submit">
+            <button className="primaryButton" type="submit" disabled={savingOverride}>
               <ShieldCheck size={17} />
-              Apply override
+              {savingOverride ? "Saving..." : "Apply override"}
             </button>
+            <InlineStatus message={overrideMessage} />
           </form>
         </Panel>
 
@@ -639,6 +821,24 @@ function Panel({ title, children, className = "" }: { title: string; children: R
       {children}
     </section>
   );
+}
+
+function InlineStatus({ message }: { message: string }) {
+  if (!message) {
+    return null;
+  }
+  return (
+    <p className="inlineStatus" role="status" aria-live="polite">
+      {message}
+    </p>
+  );
+}
+
+function readApiError(error: { detail?: string; errors?: { message: string }[] }, fallback: string) {
+  if (error.errors?.length) {
+    return error.errors.map((item) => item.message).join(" ");
+  }
+  return error.detail ?? fallback;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

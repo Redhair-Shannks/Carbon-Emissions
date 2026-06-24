@@ -23,6 +23,8 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/ghg_platform
       SEED_WORKBOOK_PATH: /app/GHG Sheet.xlsx
       CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
     ports:
       - "8000:8000"
     depends_on:

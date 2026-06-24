@@ -83,7 +83,9 @@ def _add_factor_versions(
     )
 
 
-def _factor_for(db: Session, scope: str, source_name: str, unit: str, activity_date: date) -> EmissionFactor:
+def _factor_for(
+    db: Session, scope: str, source_name: str, unit: str, activity_date: date
+) -> EmissionFactor:
     return db.scalars(
         select(EmissionFactor)
         .where(
@@ -91,7 +93,10 @@ def _factor_for(db: Session, scope: str, source_name: str, unit: str, activity_d
             EmissionFactor.source_name == source_name,
             EmissionFactor.unit == unit,
             EmissionFactor.valid_from <= activity_date,
-            (EmissionFactor.valid_to.is_(None) | (EmissionFactor.valid_to >= activity_date)),
+            (
+                EmissionFactor.valid_to.is_(None)
+                | (EmissionFactor.valid_to >= activity_date)
+            ),
         )
         .order_by(EmissionFactor.valid_from.desc())
     ).first()
@@ -132,7 +137,10 @@ def _add_record(
 
 def seed_database(db: Session) -> dict[str, int | str]:
     if db.scalar(select(EmissionRecord.id).limit(1)):
-        return {"status": "skipped", "reason": "database already contains emission records"}
+        return {
+            "status": "skipped",
+            "reason": "database already contains emission records",
+        }
 
     workbook_path = Path(settings.seed_workbook_path)
     if not workbook_path.is_absolute():
@@ -141,14 +149,19 @@ def seed_database(db: Session) -> dict[str, int | str]:
             Path(__file__).resolve().parents[2] / workbook_path,
             Path(__file__).resolve().parents[1] / workbook_path,
         ]
-        workbook_path = next((candidate.resolve() for candidate in candidates if candidate.exists()), candidates[0].resolve())
+        workbook_path = next(
+            (candidate.resolve() for candidate in candidates if candidate.exists()),
+            candidates[0].resolve(),
+        )
     if not workbook_path.exists():
         return {"status": "missing_workbook", "path": str(workbook_path)}
 
     scope1 = pd.read_excel(workbook_path, sheet_name="Scope 1")
     scope2 = pd.read_excel(workbook_path, sheet_name="Scope 2")
 
-    for _, row in scope1.dropna(subset=["Material", "Emission Factor", "Q1 Quantity"]).iterrows():
+    for _, row in scope1.dropna(
+        subset=["Material", "Emission Factor", "Q1 Quantity"]
+    ).iterrows():
         _add_factor_versions(
             db,
             scope="Scope 1",
@@ -159,7 +172,9 @@ def seed_database(db: Session) -> dict[str, int | str]:
             source=str(row["Data Source for Emission Factor"]),
         )
 
-    for _, row in scope2.dropna(subset=["Supplier/Source", "Emission Factor (tCO₂/unit)", "Energy Consumed"]).iterrows():
+    for _, row in scope2.dropna(
+        subset=["Supplier/Source", "Emission Factor (tCO₂/unit)", "Energy Consumed"]
+    ).iterrows():
         _add_factor_versions(
             db,
             scope="Scope 2",
@@ -198,7 +213,9 @@ def seed_database(db: Session) -> dict[str, int | str]:
             notes="Generated prior-year comparison record using expired factor version",
         )
 
-    for index, row in scope2.dropna(subset=["Supplier/Source", "Energy Consumed"]).iterrows():
+    for index, row in scope2.dropna(
+        subset=["Supplier/Source", "Energy Consumed"]
+    ).iterrows():
         activity_date = _date_for_quarter(str(row["Quarter"]), 2024, int(index))
         _add_record(
             db,

@@ -44,8 +44,20 @@ def test_get_valid_factor_uses_activity_date_not_latest_factor():
         )
         db.commit()
 
-        historical = get_valid_factor(db, scope="Scope 1", source_name="Diesel", unit="KL", activity_date=date(2023, 6, 1))
-        current = get_valid_factor(db, scope="Scope 1", source_name="Diesel", unit="KL", activity_date=date(2024, 6, 1))
+        historical = get_valid_factor(
+            db,
+            scope="Scope 1",
+            source_name="Diesel",
+            unit="KL",
+            activity_date=date(2023, 6, 1),
+        )
+        current = get_valid_factor(
+            db,
+            scope="Scope 1",
+            source_name="Diesel",
+            unit="KL",
+            activity_date=date(2024, 6, 1),
+        )
 
         assert historical.version == "2023-expired"
         assert current.version == "2024-active"

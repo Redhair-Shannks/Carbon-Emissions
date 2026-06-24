@@ -86,7 +86,9 @@ class AuditLogRead(BaseModel):
 
 class BusinessMetricCreate(BaseModel):
     metric_date: date
-    metric_name: str = Field(default="Tons of Steel Produced", min_length=1, max_length=160)
+    metric_name: str = Field(
+        default="Tons of Steel Produced", min_length=1, max_length=160
+    )
     value: float = Field(gt=0)
     unit: str = Field(default="tonnes", min_length=1, max_length=80)
 

@@ -4,7 +4,13 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import BusinessMetric, EmissionFactor, EmissionRecord
-from app.services.analytics import hotspot_payload, intensity_payload, yoy_payload
+from app.services.analytics import (
+    anomaly_payload,
+    hotspot_payload,
+    intensity_payload,
+    net_zero_payload,
+    yoy_payload,
+)
 
 
 def add_factor(
@@ -149,3 +155,46 @@ def test_intensity_calculation_is_correct(db: Session) -> None:
     assert result["total_emissions_kgco2e"] == 800
     assert result["business_metric_value"] == 100
     assert result["intensity_kgco2e_per_unit"] == 8
+
+
+def test_anomaly_detection_flags_source_outlier(db: Session) -> None:
+    factor = add_factor(
+        db,
+        scope="Scope 1",
+        source_name="Diesel",
+        factor=1,
+        valid_from=date(2024, 1, 1),
+    )
+    for month, emissions in enumerate([100, 100, 100, 100, 100, 1000], start=1):
+        add_record(
+            db,
+            factor=factor,
+            activity_date=date(2024, month, 1),
+            emissions=emissions,
+        )
+    db.commit()
+
+    result = anomaly_payload(db, 2024)
+
+    assert result["total_flagged"] == 1
+    assert result["anomalies"][0]["source_name"] == "Diesel"
+    assert result["anomalies"][0]["emissions_kgco2e"] == 1000
+    assert result["anomalies"][0]["z_score"] > 2
+
+
+def test_net_zero_tracker_calculates_target_and_progress(db: Session) -> None:
+    seed_analytics_data(db)
+
+    result = net_zero_payload(
+        db,
+        current_year=2024,
+        baseline_year=2023,
+        target_year=2030,
+        target_reduction_pct=50,
+    )
+
+    assert result["baseline_emissions_kgco2e"] == 300
+    assert result["current_emissions_kgco2e"] == 800
+    assert result["target_emissions_kgco2e"] == 150
+    assert result["progress_pct"] == 0
+    assert result["status"] == "action-required"

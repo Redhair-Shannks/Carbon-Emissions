@@ -7,6 +7,31 @@ from sqlalchemy.orm import Session
 from app.models import AuditLog, EmissionFactor, EmissionRecord
 
 
+def test_api_root_redirects_to_docs(client: TestClient) -> None:
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"
+
+
+def test_ai_insights_returns_three_fallback_insights_without_api_key(
+    client: TestClient,
+) -> None:
+    response = client.get("/analytics/ai-insights")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generated_by"] == "deterministic-analytics"
+    assert len(payload["insights"]) == 3
+
+
+def test_scope_3_categories_expose_ghg_protocol_skeleton(client: TestClient) -> None:
+    response = client.get("/metadata/scope-3-categories")
+
+    assert response.status_code == 200
+    assert len(response.json()["categories"]) == 15
+
+
 def add_scope_2_factor(db: Session) -> EmissionFactor:
     factor = EmissionFactor(
         scope="Scope 2",

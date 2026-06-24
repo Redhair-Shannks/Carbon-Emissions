@@ -22,7 +22,10 @@ def get_valid_factor(
             func.lower(EmissionFactor.source_name) == source_name.lower(),
             func.lower(EmissionFactor.unit) == unit.lower(),
             EmissionFactor.valid_from <= activity_date,
-            or_(EmissionFactor.valid_to.is_(None), EmissionFactor.valid_to >= activity_date),
+            or_(
+                EmissionFactor.valid_to.is_(None),
+                EmissionFactor.valid_to >= activity_date,
+            ),
         )
         .order_by(EmissionFactor.valid_from.desc(), EmissionFactor.id.desc())
     )

@@ -10,4 +10,6 @@ logs/
 node_modules/
 dist/
 .DS_Store
+.edge-*/
+.chrome-*/
 postgres_data/
